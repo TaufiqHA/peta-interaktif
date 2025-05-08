@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Peta Multi Polygon dengan PIC Lengkap</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- Bootstrap -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+      #map {
+        height: 90vh;
+        width: 100%;
+      }
+      #picPreview {
+        max-width: 100%;
+        height: auto;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container my-2">
+      <div class="d-flex justify-content-between">
+        <div>
+          <button class="btn btn-success" onclick="openUploadModal()">
+            Tambah Peta
+          </button>
+          <select
+            id="mapSelect"
+            class="form-select d-inline-block"
+            style="width: auto"
+            onchange="changeMap()"
+          ></select>
+        </div>
+        <button class="btn btn-danger" onclick="deleteCurrentMap()">
+          Hapus Peta Ini
+        </button>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Modal Upload Peta -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+      <div class="modal-dialog">
+        <form id="uploadForm" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Upload Peta Baru</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nama Peta</label>
+              <input type="text" id="mapName" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">File PNG</label>
+              <input
+                type="file"
+                id="mapFile"
+                class="form-control"
+                accept="image/png"
+                required
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Upload</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Input PIC -->
+    <div class="modal fade" id="picModal" tabindex="-1">
+      <div class="modal-dialog">
+        <form id="picForm" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Input Data PIC</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nama PIC</label>
+              <input type="text" id="picName" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Nama Karyawan</label>
+              <input
+                type="text"
+                id="employeeName"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Foto PIC</label>
+              <input
+                type="file"
+                id="picPhoto"
+                class="form-control"
+                accept="image/*"
+                required
+              />
+              <img
+                id="picPreview"
+                src="#"
+                alt="Preview"
+                style="display: none"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Simpan PIC</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      let map = L.map("map").setView([-6.2, 106.8], 16);
+      let currentOverlay = null;
+      let drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+
+      let drawControl = new L.Control.Draw({
+        edit: { featureGroup: drawnItems },
+        draw: {
+          polygon: true,
+          rectangle: true,
+          circle: true,
+          polyline: false,
+          marker: false,
+          circlemarker: false,
+        },
+      });
+      map.addControl(drawControl);
+
+      let currentMapName = null;
+      let layerToPic = new Map();
+      let tempLayer = null; // Layer sementara sebelum PIC diisi
+
+      function openUploadModal() {
+        const modal = new bootstrap.Modal(
+          document.getElementById("uploadModal")
+        );
+        modal.show();
+      }
+
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const name = document.getElementById("mapName").value.trim();
+          const file = document.getElementById("mapFile").files[0];
+          const picName = document.getElementById("picName").value.trim();
+          const shape = {
+            /* Struktur shape sesuai kebutuhan */
+          };
+
+          if (!name || !file || !picName) return;
+
+          const formData = new FormData();
+          formData.append("area_name", name);
+          formData.append("pic_name", picName);
+          formData.append("pic_image", file);
+          formData.append("shape", JSON.stringify(shape));
+
+          fetch("/api/simpan", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              alert(data.message);
+            })
+            .catch((error) => console.error("Error:", error));
+        });
+
+      function loadMapOptions() {
+        const select = document.getElementById("mapSelect");
+        select.innerHTML = "";
+        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
+        for (const name in maps) {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          select.appendChild(option);
+        }
+      }
+
+      function changeMap() {
+        const name = document.getElementById("mapSelect").value;
+        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
+
+        if (!maps[name]) return;
+
+        if (currentOverlay) map.removeLayer(currentOverlay);
+        drawnItems.clearLayers();
+        layerToPic.clear();
+
+        currentOverlay = L.imageOverlay(maps[name].image, [
+          [-6.25, 106.75],
+          [-6.15, 106.85],
+        ]).addTo(map);
+
+        maps[name].areas.forEach((area) => {
+          let layer;
+          if (area.shape.type === "circle") {
+            layer = L.circle(area.shape.center, { radius: area.shape.radius });
+          } else if (area.shape.type === "rectangle") {
+            layer = L.rectangle(area.shape.latlngs);
+          } else {
+            layer = L.polygon(area.shape.latlngs);
+          }
+          layer.addTo(drawnItems);
+          if (area.pic) {
+            const popupContent = `
+              <b>Nama PIC:</b> ${area.pic.name}<br>
+              <b>Nama Karyawan:</b> ${area.pic.employee}<br>
+              <img src="${area.pic.photo}" style="width:100px;height:auto;margin-top:5px;" />
+            `;
+            layer.bindPopup(popupContent);
+            layer.bindTooltip(popupContent);
+
+            layerToPic.set(layer, area.pic);
+          }
+        });
+
+        currentMapName = name;
+      }
+
+      map.on(L.Draw.Event.CREATED, function (e) {
+        tempLayer = e.layer;
+        const modal = new bootstrap.Modal(document.getElementById("picModal"));
+        document.getElementById("picForm").reset();
+        document.getElementById("picPreview").style.display = "none";
+        modal.show();
+      });
+
+      document
+        .getElementById("picPhoto")
+        .addEventListener("change", function () {
+          const file = this.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const preview = document.getElementById("picPreview");
+              preview.src = e.target.result;
+              preview.style.display = "block";
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+      document
+        .getElementById("picForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const name = document.getElementById("picName").value.trim();
+          const employee = document.getElementById("employeeName").value.trim();
+          const file = document.getElementById("picPhoto").files[0];
+
+          if (!name || !employee || !file || !tempLayer) return;
+
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            const base64 = event.target.result;
+
+            const picData = {
+              name: name,
+              employee: employee,
+              photo: base64,
+            };
+
+            const popupContent = `
+            <b>Nama PIC:</b> ${picData.name}<br>
+            <b>Nama Karyawan:</b> ${picData.employee}<br>
+            <img src="${picData.photo}" style="width:100px;height:auto;margin-top:5px;" />
+          `;
+
+            tempLayer.bindPopup(popupContent);
+            layerToPic.set(tempLayer, picData);
+            drawnItems.addLayer(tempLayer);
+            saveAreas();
+
+            bootstrap.Modal.getInstance(
+              document.getElementById("picModal")
+            ).hide();
+            tempLayer = null;
+          };
+          reader.readAsDataURL(file);
+        });
+
+      map.on("draw:edited", function () {
+        saveAreas();
+      });
+
+      map.on("draw:deleted", function () {
+        saveAreas();
+      });
+
+      function saveAreas() {
+        if (!currentMapName) return;
+        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
+        if (!maps[currentMapName]) return;
+
+        const areas = [];
+        drawnItems.eachLayer((layer) => {
+          let shape = {};
+          if (layer instanceof L.Circle) {
+            shape = {
+              type: "circle",
+              center: layer.getLatLng(),
+              radius: layer.getRadius(),
+            };
+          } else if (layer instanceof L.Rectangle) {
+            shape = {
+              type: "rectangle",
+              latlngs: layer.getLatLngs(),
+            };
+          } else {
+            shape = {
+              type: "polygon",
+              latlngs: layer.getLatLngs(),
+            };
+          }
+          const pic = layerToPic.get(layer) || null;
+          areas.push({ shape, pic });
+        });
+        maps[currentMapName].areas = areas;
+        localStorage.setItem("maps", JSON.stringify(maps));
+      }
+
+      function deleteCurrentMap() {
+        if (!currentMapName) return;
+        if (!confirm("Yakin ingin menghapus peta ini beserta semua datanya?"))
+          return;
+
+        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
+        delete maps[currentMapName];
+        localStorage.setItem("maps", JSON.stringify(maps));
+
+        loadMapOptions();
+        currentOverlay && map.removeLayer(currentOverlay);
+        drawnItems.clearLayers();
+        layerToPic.clear();
+        currentMapName = null;
+      }
+
+      window.onload = function () {
+        loadMapOptions();
+        if (document.getElementById("mapSelect").options.length > 0) {
+          document.getElementById("mapSelect").selectedIndex = 0;
+          changeMap();
+        }
+      };
+
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          const name = document.getElementById("mapName").value.trim();
+          const file = document.getElementById("mapFile").files[0];
+
+          if (!name || !file) {
+            alert("Nama dan file harus diisi.");
+            return;
+          }
+
+          // Cek duplikat nama peta di localStorage (frontend only)
+          const maps = JSON.parse(localStorage.getItem("maps") || "{}");
+          if (maps[name]) {
+            alert("Nama peta sudah ada, gunakan nama lain.");
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append("map_name", name);
+          formData.append("map_file", file);
+
+          fetch("http://localhost:3000/api/upload-map", {
+            method: "POST",
+            body: formData,
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.error) {
+                alert("Gagal upload: " + data.error);
+                return;
+              }
+
+              // Tambahkan ke localStorage untuk frontend tracking
+              maps[name] = {
+                image: data.path, // gunakan path dari server
+                areas: [],
+              };
+              localStorage.setItem("maps", JSON.stringify(maps));
+
+              loadMapOptions();
+              document.getElementById("mapSelect").value = name;
+              changeMap();
+
+              bootstrap.Modal.getInstance(
+                document.getElementById("uploadModal")
+              ).hide();
+              document.getElementById("uploadForm").reset();
+            })
+            .catch((err) => {
+              console.error(err);
+              alert("Terjadi kesalahan saat upload.");
+            });
+        });
+    </script>
+  </body>
+</html>
