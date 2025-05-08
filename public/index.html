@@ -204,32 +204,40 @@
 
       function loadMapOptions() {
         const select = document.getElementById("mapSelect");
-        select.innerHTML = "";
-        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
-        for (const name in maps) {
-          const option = document.createElement("option");
-          option.value = name;
-          option.textContent = name;
-          select.appendChild(option);
-        }
+        fetch("http://localhost:3000/api/maps")
+          .then((res) => res.json())
+          .then((data) => {
+            select.innerHTML = "";
+            data.forEach((map) => {
+              const option = document.createElement("option");
+              option.value = map.name;
+              option.textContent = map.name;
+              select.appendChild(option);
+            });
+
+            if (data.length > 0) {
+              select.selectedIndex = 0;
+              mapsData = data;
+              changeMap();
+            }
+          });
       }
 
       function changeMap() {
         const name = document.getElementById("mapSelect").value;
-        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
-
-        if (!maps[name]) return;
+        const selected = mapsData.find((m) => m.name === name);
+        if (!selected) return;
 
         if (currentOverlay) map.removeLayer(currentOverlay);
         drawnItems.clearLayers();
         layerToPic.clear();
 
-        currentOverlay = L.imageOverlay(maps[name].image, [
+        currentOverlay = L.imageOverlay(selected.image, [
           [-6.25, 106.75],
           [-6.15, 106.85],
         ]).addTo(map);
 
-        maps[name].areas.forEach((area) => {
+        selected.areas.forEach((area) => {
           let layer;
           if (area.shape.type === "circle") {
             layer = L.circle(area.shape.center, { radius: area.shape.radius });
@@ -239,15 +247,15 @@
             layer = L.polygon(area.shape.latlngs);
           }
           layer.addTo(drawnItems);
+
           if (area.pic) {
             const popupContent = `
-              <b>Nama PIC:</b> ${area.pic.name}<br>
-              <b>Nama Karyawan:</b> ${area.pic.employee}<br>
-              <img src="${area.pic.photo}" style="width:100px;height:auto;margin-top:5px;" />
-            `;
+        <b>Nama PIC:</b> ${area.pic.name}<br>
+        <b>Nama Karyawan:</b> ${area.pic.employee}<br>
+        <img src="${area.pic.photo}" style="width:100px;height:auto;margin-top:5px;" />
+      `;
             layer.bindPopup(popupContent);
             layer.bindTooltip(popupContent);
-
             layerToPic.set(layer, area.pic);
           }
         });
@@ -327,8 +335,6 @@
 
       function saveAreas() {
         if (!currentMapName) return;
-        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
-        if (!maps[currentMapName]) return;
 
         const areas = [];
         drawnItems.eachLayer((layer) => {
@@ -353,8 +359,16 @@
           const pic = layerToPic.get(layer) || null;
           areas.push({ shape, pic });
         });
-        maps[currentMapName].areas = areas;
-        localStorage.setItem("maps", JSON.stringify(maps));
+
+        fetch("http://localhost:3000/api/save-areas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mapName: currentMapName, areas }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            console.log(data.message);
+          });
       }
 
       function deleteCurrentMap() {
@@ -362,15 +376,18 @@
         if (!confirm("Yakin ingin menghapus peta ini beserta semua datanya?"))
           return;
 
-        const maps = JSON.parse(localStorage.getItem("maps") || "{}");
-        delete maps[currentMapName];
-        localStorage.setItem("maps", JSON.stringify(maps));
-
-        loadMapOptions();
-        currentOverlay && map.removeLayer(currentOverlay);
-        drawnItems.clearLayers();
-        layerToPic.clear();
-        currentMapName = null;
+        fetch(`http://localhost:3000/api/delete-map/${currentMapName}`, {
+          method: "DELETE",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            alert(data.message);
+            currentOverlay && map.removeLayer(currentOverlay);
+            drawnItems.clearLayers();
+            layerToPic.clear();
+            currentMapName = null;
+            loadMapOptions();
+          });
       }
 
       window.onload = function () {
