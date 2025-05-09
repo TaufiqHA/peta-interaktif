@@ -49,9 +49,12 @@
             onchange="changeMap()"
           ></select>
         </div>
-        <button class="btn btn-danger" onclick="deleteCurrentMap()">
-          Hapus Peta Ini
-        </button>
+        <div>
+          <button class="btn btn-primary" onclick="shareMap()">Share</button>
+          <button class="btn btn-danger" onclick="deleteCurrentMap()">
+            Hapus Peta Ini
+          </button>
+        </div>
       </div>
     </div>
 
@@ -473,6 +476,19 @@
               alert("Terjadi kesalahan saat upload.");
             });
         });
+
+      function shareMap() {
+        if (!currentMapName) {
+          alert("Tidak ada peta yang dipilih.");
+          return;
+        }
+        const url = `${
+          window.location.origin
+        }/viewer.html?map=${encodeURIComponent(currentMapName)}`;
+        navigator.clipboard.writeText(url).then(() => {
+          alert("Link peta telah disalin: " + url);
+        });
+      }
     </script>
   </body>
 </html>
