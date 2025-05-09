@@ -232,35 +232,54 @@
         drawnItems.clearLayers();
         layerToPic.clear();
 
-        currentOverlay = L.imageOverlay(selected.image, [
-          [-6.25, 106.75],
-          [-6.15, 106.85],
-        ]).addTo(map);
+        const img = new Image();
+        img.onload = function () {
+          const aspectRatio = img.width / img.height;
 
-        selected.areas.forEach((area) => {
-          let layer;
-          if (area.shape.type === "circle") {
-            layer = L.circle(area.shape.center, { radius: area.shape.radius });
-          } else if (area.shape.type === "rectangle") {
-            layer = L.rectangle(area.shape.latlngs);
-          } else {
-            layer = L.polygon(area.shape.latlngs);
-          }
-          layer.addTo(drawnItems);
+          // Tentukan tinggi peta dalam derajat lat (misalnya 0.1 derajat)
+          const heightDeg = 0.1;
+          const widthDeg = heightDeg * aspectRatio;
 
-          if (area.pic) {
-            const popupContent = `
-        <b>Nama PIC:</b> ${area.pic.name}<br>
-        <b>Nama Karyawan:</b> ${area.pic.employee}<br>
-        <img src="${area.pic.photo}" style="width:100px;height:auto;margin-top:5px;" />
-      `;
-            layer.bindPopup(popupContent);
-            layer.bindTooltip(popupContent);
-            layerToPic.set(layer, area.pic);
-          }
-        });
+          const southWest = L.latLng(-6.25, 106.75); // titik pojok kiri bawah
+          const northEast = L.latLng(
+            southWest.lat + heightDeg,
+            southWest.lng + widthDeg
+          );
+          const bounds = L.latLngBounds(southWest, northEast);
 
-        currentMapName = name;
+          currentOverlay = L.imageOverlay(selected.image, bounds).addTo(map);
+          map.fitBounds(bounds); // agar peta menyesuaikan ukuran overlay
+
+          // Tambahkan kembali area
+          selected.areas.forEach((area) => {
+            let layer;
+            if (area.shape.type === "circle") {
+              layer = L.circle(area.shape.center, {
+                radius: area.shape.radius,
+              });
+            } else if (area.shape.type === "rectangle") {
+              layer = L.rectangle(area.shape.latlngs);
+            } else {
+              layer = L.polygon(area.shape.latlngs);
+            }
+            layer.addTo(drawnItems);
+
+            if (area.pic) {
+              const popupContent = `
+          <b>Nama PIC:</b> ${area.pic.name}<br>
+          <b>Nama Karyawan:</b> ${area.pic.employee}<br>
+          <img src="${area.pic.photo}" style="width:100px;height:auto;margin-top:5px;" />
+        `;
+              layer.bindPopup(popupContent);
+              layer.bindTooltip(popupContent);
+              layerToPic.set(layer, area.pic);
+            }
+          });
+
+          currentMapName = name;
+        };
+
+        img.src = selected.image;
       }
 
       map.on(L.Draw.Event.CREATED, function (e) {
